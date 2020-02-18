@@ -17,14 +17,16 @@ w = 1
 P = MHP(mu = mu, alpha = alpha, omega = w, I = I, M = M, N = N)
 P.actor_p()
 P.generate_seq()
-print(P.data)
 data_copy = P.data
-len_data = len(data.copy)
+len_data = len(data_copy)
 rand_len = np.random.randint(len_data, size = 8)
 for rand_num in rand_len:
     data_copy[rand_num][1] = -1
 
-P.EM(Ahat = alpha, mhat = mu, omega = w, seq = data_copy, maxiter=10000)
+print('generate done!')
+
+
+P.EM(Ahat = alpha, mhat = mu, omega = w, seq = data_copy, N = N, M = M, maxiter=10000)
 
 
 # P.plot_events()

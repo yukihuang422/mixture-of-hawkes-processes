@@ -30,7 +30,7 @@ class MHP:
         self.data = []
         self.alpha, self.mu, self.omega = np.array(alpha), np.array(mu), omega
         self.dim = self.mu.shape[0] # dimension
-        self.check_stability()
+        # self.check_stability()
         self.actors = I
         self.actor_pairs = M
         self.nEvent = N
@@ -157,7 +157,7 @@ class MHP:
     # EM LEARNING
     #-----------
 
-    def EM(self, Ahat, mhat, omega, seq=[], smx=None, tmx=None, regularize=False, 
+    def EM(self, Ahat, mhat, omega, N, M, seq=[], smx=None, tmx=None, regularize=False, 
            Tm=-1, maxiter=100, epsilon=0.01, verbose=True):
         '''implements MAP EM. Optional to regularize with `smx` and `tmx` matrix (shape=(dim,dim)).
         In general, the `tmx` matrix is a pseudocount of parent events from column j,
@@ -260,7 +260,7 @@ class MHP:
                 if sequ[i] != -1:
                     pi[i,:] = 0
                     pi[i, sequ[i]] = 1
-                elif:
+                else:
                     for j in range(dim):
                         max_pi = 0
                         pi[i, j] = get_pi(i,j)
@@ -268,14 +268,16 @@ class MHP:
                             max_pi = pi[i,j]              
                     sum_pi = 0
                     for j in range(dim):
-                        pi[i,j] = exp(pi[i,j] - max_pi)
+                        pi[i,j] = np.exp(pi[i,j] - max_pi)
                         sum_pi += pi[i,j]
+                    pi = np.array(pi, dtype = 'float')
+                    np.seterr(divide='ignore', invalid='ignore')
                     pi[i,:] /= sum_pi
 
 
             # Au
             Au = Ahat[sequ]
-            ag = np.multiply(Auu, kern)
+            ag = np.multiply(Au, kern)
             ag[np.triu_indices(N)] = 0
             ag_pi = ag.copy()
 
@@ -295,7 +297,7 @@ class MHP:
             rate_pi = mu + np.sum(ag_pi, axis=1)
 
             # compute matrix of eta_nn and eta_ln  (keep separate for later computations)
-            eta_ln = np.divide(ag, np.tile(np.array([rate_pi], (1,N)))
+            eta_ln = np.divide(ag, np.tile(np.array([rate_pi], (1,N))))
             eta_nn = np.divide(mu, rate_pi)
 
             # compute mhat:  mhat_u = (\sum_{u_i=u} eta_nn) / T
@@ -381,8 +383,7 @@ class MHP:
             k += 1
 
         if verbose:
-            print('Reached max iter (%d
-            ).' % maxiter)
+            print('Reached max iter (%d).' % maxiter)
 
         self.Ahat = Ahat
         self.mhat = mhat
