@@ -9,4 +9,4 @@ a = np.array([[0,1],
 seq = a[:,1].astype(int)
 ahat = [0.1, 0.2, 0.3, 0.4]
 au = np.array(ahat)[seq]
-print(au)
+print(a[:,1])

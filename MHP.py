@@ -332,9 +332,10 @@ class MHP:
 
             # approx of Gt sum in a_{uu'} denom
             seqcnts = []
+            seq_idx = []
             for i in range(dim):
-                seq_idx = np.where(seq[:,1] == i)
-                pi_beta = pi[:,i].T
+                seq_idx = np.where(seq[:,1] == i)[0]
+                pi_beta = pi[:,i]
                 alpha_sum = 0
                 for j in seq_idx:
                     alpha_sum += pi_beta[j]
@@ -349,11 +350,11 @@ class MHP:
                 vp_res = sum_etaln(i)
                 vp.append(vp_res)
             print('vp done!')
-            
+
             Ahat = np.divide(np.array(vp),seqcnts)
             print('ahat done!')
             
-            def get_term_11(n,m):
+            def get_term11(n,m):
                 c = cartesian([np.where(seq[:,1]==int(m))[0], np.where(seq[:,1]==int(m))[0]]) # record the row index of event on every dimension
                 sum_l = 0
                 try:
