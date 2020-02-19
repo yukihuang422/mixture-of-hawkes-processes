@@ -289,26 +289,32 @@ class MHP:
            
 
             # compute ag with pi
-            for i in range(len(ag)):
-                for j in range(len(ag[0])):
-                    ag_pi[i][j] = get_sum_sm(i,j) * ag[i,j]
+            for i in range(0, ag.shape[0]):
+                for j in range(0, ag.shape[1]):
+                    dimension = sequ[j]
+                    ag_pi[i][j] = get_sum_sm(dimension,j) * ag[i,j]
             
             # compute rate with pi
             rate_pi = mu + np.sum(ag_pi, axis=1)
 
             # compute matrix of eta_nn and eta_ln  (keep separate for later computations)
-            eta_ln = np.divide(ag, np.tile(np.array([rate_pi], (1,N))))
+            eta_ln = np.divide(ag, np.tile(np.array([rate_pi]).T, (1,N)))
             eta_nn = np.divide(mu, rate_pi)
+            print('eta done!')
 
             # compute mhat:  mhat_u = (\sum_{u_i=u} eta_nn) / T
-            m_sum = 0
+            
             mhat = []
             for i in range(dim):
                 seq_idx = np.where(seq[:,1] == i)
+                m_sum = 0
+                pi_beta = pi[:,i].T
                 for j in seq_idx:
-                    m_sum += eta_nn[j] * pi[j][i]
+                    m_sum += eta_nn[j] * pi_beta[j]
                 mhat.append(m_sum)
+            mhat = np.array(mhat)
             mhat /= Tm
+            print('mhat done!')
 
             # returns sum of all pmat vals where u_i=a
             # *IF* pmat upper tri set to zero, this is 
@@ -320,24 +326,32 @@ class MHP:
                 for n in c[:,0]:
                     for l in c[:,1]:
                         sum_l += get_sum_sm(a, l) * eta_ln[c[:,0], c[:,1]]
-                    sum_n += get_sum_sm(s, n) * sum_l
+                    sum_n += pi[n, a] * sum_l
                 return sum_n
-            vp = np.vectorize(sum_etaln)
+            # vp = np.vectorize(sum_etaln)
 
             # approx of Gt sum in a_{uu'} denom
-            alpha_sum = 0
             seqcnts = []
             for i in range(dim):
-                seq_idx = np.where(seq[:1] == i)
+                seq_idx = np.where(seq[:,1] == i)
+                pi_beta = pi[:,i].T
+                alpha_sum = 0
                 for j in seq_idx:
-                    alpha_sum += pi[j][i]
+                    alpha_sum += pi_beta[j]
                 seqcnts.append(alpha_sum)
+            seqcnts = np.array(seqcnts)
+            print('seqcnts done!')
 
             # ahat_{u,u'} = (\sum_{u_i=u}\sum_{u_j=u', j<i} eta_ln) / \sum_{u_j=u'} G(T-t_j)
             # approximate with G(T-T_j) = 1
+            vp = []
+            for i in range(dim):
+                vp_res = sum_etaln(i)
+                vp.append(vp_res)
+            print('vp done!')
             
-            Ahat = np.divide(np.fromfunction(lambda i,j: vp(i), dim),
-                                 seqcnts)
+            Ahat = np.divide(np.array(vp),seqcnts)
+            print('ahat done!')
             
             def get_term_11(n,m):
                 c = cartesian([np.where(seq[:,1]==int(m))[0], np.where(seq[:,1]==int(m))[0]]) # record the row index of event on every dimension

@@ -1,7 +1,12 @@
 import numpy as np
 a = np.array([[0,1],
-             [2,3],
-             [3,4],
-             [4,5],
-             [5,6]])
-print(np.where(a>3))
+             [2,0],
+             [3,1],
+             [4,2],
+             [5,1],
+             [6,3],
+             [7,0]])
+seq = a[:,1].astype(int)
+ahat = [0.1, 0.2, 0.3, 0.4]
+au = np.array(ahat)[seq]
+print(au)
