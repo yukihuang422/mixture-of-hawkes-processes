@@ -190,7 +190,7 @@ class MHP:
         k = 0
         old_LL = -10000
         START = T.time()
-        while k < maxiter:
+        while k < 1:
 
             # get Sm to compute pi
             # get_sm : return the list of event index that share actors with i
@@ -262,7 +262,7 @@ class MHP:
                     pi[i, sequ[i]] = 1
                 else:
                     for j in range(dim):
-                        max_pi = 0
+                        max_pi = -1000000000
                         pi[i, j] = get_pi(i,j)
                         if pi[i,j] > max_pi:
                             max_pi = pi[i,j]              
@@ -271,8 +271,10 @@ class MHP:
                         pi[i,j] = np.exp(pi[i,j] - max_pi)
                         sum_pi += pi[i,j]
                     pi = np.array(pi, dtype = 'float')
-                    np.seterr(divide='ignore', invalid='ignore')
+                    # np.seterr(divide='ignore', invalid='ignore')
                     pi[i,:] /= sum_pi
+                    # print(sum_pi)
+            
 
 
             # Au
@@ -306,11 +308,13 @@ class MHP:
             
             mhat = []
             for i in range(dim):
-                seq_idx = np.where(seq[:,1] == i)
+                seq_idx = np.where(seq[:,1] == i)[0]
                 m_sum = 0
-                pi_beta = pi[:,i].T
+                pi_beta = pi[:,i]
                 for j in seq_idx:
                     m_sum += eta_nn[j] * pi_beta[j]
+                    if m_sum == 0:
+                        m_sum == 0.01
                 mhat.append(m_sum)
             mhat = np.array(mhat)
             mhat /= Tm
@@ -320,12 +324,13 @@ class MHP:
             # *IF* pmat upper tri set to zero, this is 
             # \sum_{u_i=u}\sum_{u_j=u', j<i} p_{ij}
             def sum_etaln(a):
-                c = cartesian([np.where(seq[:,1]==int(a))[0], np.where(seq[:,1]==int(a))[0]]) # record the row index of event on every dimension
+                c = np.where(seq[:,1]==int(a))[0] # record the row index of event on every dimension
                 sum_l = 0
                 sum_n = 0
-                for n in c[:,0]:
-                    for l in c[:,1]:
-                        sum_l += get_sum_sm(a, l) * eta_ln[c[:,0], c[:,1]]
+                for n in c:
+                    for l in range(n-1):
+                        if l in c:
+                            sum_l += eta_ln[n, l] # ignore get_sum_sm(a,l)
                     sum_n += pi[n, a] * sum_l
                 return sum_n
             # vp = np.vectorize(sum_etaln)
@@ -343,36 +348,43 @@ class MHP:
             seqcnts = np.array(seqcnts)
             print('seqcnts done!')
 
-            # ahat_{u,u'} = (\sum_{u_i=u}\sum_{u_j=u', j<i} eta_ln) / \sum_{u_j=u'} G(T-t_j)
             # approximate with G(T-T_j) = 1
             vp = []
             for i in range(dim):
                 vp_res = sum_etaln(i)
                 vp.append(vp_res)
+            # print(vp)
             print('vp done!')
 
             Ahat = np.divide(np.array(vp),seqcnts)
             print('ahat done!')
             
             def get_term11(n,m):
-                c = cartesian([np.where(seq[:,1]==int(m))[0], np.where(seq[:,1]==int(m))[0]]) # record the row index of event on every dimension
+                c = np.where(seq[:,1]==int(m))[0] # record the row index of event on every dimension
                 sum_l = 0
                 try:
-                    for l in c[:,1]:
-                        sum_l += get_sum_sm(m, l) * eta_ln[c[:,0], c[:,1]] * log(Ahat[m]*kern[n,l]/eta_ln[c[:,0], c[:,1]])
-                except:
-                    print('log error!')
+                    for l in range(n-1):
+                        for l in c:
+                            # print(Ahat[m]*kern[n,l])
+                            # print(eta_ln[c[:,0], c[:,1]])
+                            sum_l += eta_ln[n, l] * math.log(Ahat[m]*kern[n,l]/eta_ln[n, l])
+                except ValueError:
+                    print('value error in term11!')
                 return sum_l
             
             def get_term12(n,m):
+                #sum_eta = 0
                 try:
-                    sum_eta = eta_nn[n] * log(mhat[m]/eta_nn[n])
-                except:
-                    print('log error!')
+                    sum_eta = eta_nn[n] * math.log(mhat[m]/eta_nn[n])
+                except ValueError:
+                    print('log error in term12!')
+                    print(mhat[m])
+                    print(eta_nn[n])
                 return sum_eta
 
             if k % 10 == 0:
                 #term1 = np.sum(np.log(rates))
+                term1 = 0
                 for i in range(N):
                     for j in range(dim):
                         term11 = get_term11(i,j)
@@ -402,7 +414,7 @@ class MHP:
 
         self.Ahat = Ahat
         self.mhat = mhat
-        return Ahat, mhat
+        return Ahat, mhat, pi
 
     #-----------
     # VISUALIZATION METHODS
