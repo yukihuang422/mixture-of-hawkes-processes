@@ -158,7 +158,7 @@ class MHP:
     #-----------
 
     def EM(self, Ahat, mhat, omega, N, M, seq=[], smx=None, tmx=None, regularize=False, 
-           Tm=-1, maxiter=100, epsilon=0.01, verbose=True):
+           Tm=-1, maxiter=100, epsilon=0.00001, verbose=True):
         '''implements MAP EM. Optional to regularize with `smx` and `tmx` matrix (shape=(dim,dim)).
         In general, the `tmx` matrix is a pseudocount of parent events from column j,
         and the `smx` matrix is a pseudocount of child events from column j -> i, 
@@ -190,7 +190,7 @@ class MHP:
         k = 0
         old_LL = -10000
         START = T.time()
-        while k < 1:
+        while k < 21:
 
             # get Sm to compute pi
             # get_sm : return the list of event index that share actors with i
@@ -208,9 +208,7 @@ class MHP:
                 sm = get_sm(i)
                 res_sum = 0
                 for m in sm:
-                    if pi[j][m] == 1:
-                        res_sum = 1
-                    break
+                    res_sum += pi[j, m]
                 return res_sum
 
             # compute pi
@@ -237,7 +235,9 @@ class MHP:
                 try:
                     for l in range(n-1):
                         if seq[l,1] == m:
-                            sum_past += eta_ln[l,n] * get_sum_sm(m, l) * np.log(Ahat[m] * kern[n,l] / eta_ln[l,n])
+                            if eta_ln[n, l] == 0.0:
+                                eta_ln[n, l] = 0.000000000000000001
+                            sum_past += eta_ln[n,l] * get_sum_sm(m, l) * np.log(Ahat[m] * kern[n,l] / eta_ln[n,l])
                 except:
                     print('log error!')
                 pi_result += sum_past
@@ -247,11 +247,11 @@ class MHP:
                 try:
                     for l in range(n+1,N):
                         if seq[l,1] == m:
-                            sum_future += eta_ln[n,l] * get_sum_sm(m, l) * np.log(Ahat[m] * kern[l,n]) 
+                            sum_future += eta_ln[l,n] * get_sum_sm(m, l) * np.log(Ahat[m] * kern[l,n]) 
                 except:
                     print('log error!')
                 pi_result += sum_future
-
+                
                 return pi_result
                  
 
@@ -261,21 +261,13 @@ class MHP:
                     pi[i,:] = 0
                     pi[i, sequ[i]] = 1
                 else:
-                    for j in range(dim):
-                        max_pi = -1000000000
-                        pi[i, j] = get_pi(i,j)
-                        if pi[i,j] > max_pi:
-                            max_pi = pi[i,j]              
                     sum_pi = 0
+                    for j in range(dim):  
+                        pi[i, j] = get_pi(i,j)
+                        sum_pi += pi[i,j]             
                     for j in range(dim):
-                        pi[i,j] = np.exp(pi[i,j] - max_pi)
-                        sum_pi += pi[i,j]
-                    pi = np.array(pi, dtype = 'float')
-                    # np.seterr(divide='ignore', invalid='ignore')
-                    pi[i,:] /= sum_pi
-                    # print(sum_pi)
-            
-
+                        pi[i,j] = pi[i,j] / sum_pi
+                    pi = np.array(pi, dtype = 'float')   
 
             # Au
             Au = Ahat[sequ]
@@ -302,7 +294,7 @@ class MHP:
             # compute matrix of eta_nn and eta_ln  (keep separate for later computations)
             eta_ln = np.divide(ag, np.tile(np.array([rate_pi]).T, (1,N)))
             eta_nn = np.divide(mu, rate_pi)
-            print('eta done!')
+            #print('eta done!')
 
             # compute mhat:  mhat_u = (\sum_{u_i=u} eta_nn) / T
             
@@ -314,11 +306,11 @@ class MHP:
                 for j in seq_idx:
                     m_sum += eta_nn[j] * pi_beta[j]
                     if m_sum == 0:
-                        m_sum == 0.01
+                        m_sum == 0.0000000000001
                 mhat.append(m_sum)
             mhat = np.array(mhat)
             mhat /= Tm
-            print('mhat done!')
+            # print('mhat done!')
 
             # returns sum of all pmat vals where u_i=a
             # *IF* pmat upper tri set to zero, this is 
@@ -346,7 +338,7 @@ class MHP:
                     alpha_sum += pi_beta[j]
                 seqcnts.append(alpha_sum)
             seqcnts = np.array(seqcnts)
-            print('seqcnts done!')
+            # print('seqcnts done!')
 
             # approximate with G(T-T_j) = 1
             vp = []
@@ -354,20 +346,22 @@ class MHP:
                 vp_res = sum_etaln(i)
                 vp.append(vp_res)
             # print(vp)
-            print('vp done!')
+            # print('vp done!')
 
             Ahat = np.divide(np.array(vp),seqcnts)
-            print('ahat done!')
+            # print(Ahat)
+            # print('ahat done!')
             
             def get_term11(n,m):
                 c = np.where(seq[:,1]==int(m))[0] # record the row index of event on every dimension
                 sum_l = 0
                 try:
                     for l in range(n-1):
-                        for l in c:
+                        if l in c:
                             # print(Ahat[m]*kern[n,l])
-                            # print(eta_ln[c[:,0], c[:,1]])
-                            sum_l += eta_ln[n, l] * math.log(Ahat[m]*kern[n,l]/eta_ln[n, l])
+                            if eta_ln[n, l] == 0.0:
+                                eta_ln[n,l] = 0.0000000000001
+                            sum_l += get_sum_sm(m, l) * eta_ln[n, l] * math.log(Ahat[m]*kern[n,l]/eta_ln[n, l])
                 except ValueError:
                     print('value error in term11!')
                 return sum_l
@@ -375,11 +369,11 @@ class MHP:
             def get_term12(n,m):
                 #sum_eta = 0
                 try:
+                    if eta_nn[n] == 0.0:
+                        eta_nn[n] = 0.00000000001
                     sum_eta = eta_nn[n] * math.log(mhat[m]/eta_nn[n])
                 except ValueError:
                     print('log error in term12!')
-                    print(mhat[m])
-                    print(eta_nn[n])
                 return sum_eta
 
             if k % 10 == 0:
@@ -395,12 +389,12 @@ class MHP:
                 for i in range(dim):
                     for j in range(N):
                         term3 += get_sum_sm(i, j) * Ahat[i]
-                #new_LL = (1./N) * (term1 - term2 - term3)
-                new_LL = (1./N) * (term1 - term3)
+                new_LL = (1./N) * (term1 - term2 - term3)
+                # new_LL = (1./N) * (term1 - term3)
                 if abs(new_LL - old_LL) <= epsilon:
                     if verbose:
                         print('Reached stopping criterion. (Old: %1.3f New: %1.3f)' % (old_LL, new_LL))
-                    return Ahat, mhat
+                    return Ahat, mhat, pi
                 if verbose:
                     print('After ITER %d (old: %1.3f new: %1.3f)' % (k, old_LL, new_LL))
                     print(' terms %1.4f, %1.4f, %1.4f' % (term1, term2, term3))
@@ -414,6 +408,7 @@ class MHP:
 
         self.Ahat = Ahat
         self.mhat = mhat
+        self.pi = pi
         return Ahat, mhat, pi
 
     #-----------
